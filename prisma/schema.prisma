@@ -1,0 +1,154 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  DRIVER
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+enum BookingType {
+  RIDE
+  INTERCITY
+  LOGISTICS
+}
+
+enum VehicleClass {
+  SEDAN
+  SUV
+}
+
+enum ItemCategory {
+  DOCUMENT
+  SMALL_PARCEL
+  LARGE_PARCEL
+  FRAGILE
+  ELECTRONICS
+}
+
+enum DriverStatus {
+  ONLINE
+  OFFLINE
+  ON_TRIP
+}
+
+model User {
+  id            String    @id @default(uuid())
+  fullName      String
+  phone         String    @unique
+  email         String?   @unique
+  password      String
+  role          Role      @default(USER)
+  avatar        String?
+  rating        Float     @default(5.0)
+  totalRatings  Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  bookings      Booking[] @relation("UserBookings")
+  driver        Driver?
+}
+
+model Driver {
+  id              String        @id @default(uuid())
+  userId          String        @unique
+  user            User          @relation(fields: [userId], references: [id])
+  status          DriverStatus  @default(OFFLINE)
+  licenseNumber   String?
+  licenseDoc      String?       // cloudinary url
+  vehicleDoc      String?       // cloudinary url
+  isVerified      Boolean       @default(false)
+  currentLat      Float?
+  currentLng      Float?
+  rating          Float         @default(5.0)
+  totalRatings    Int           @default(0)
+  totalEarnings   Float         @default(0)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relations
+  vehicle         Vehicle?
+  bookings        Booking[]     @relation("DriverBookings")
+  earnings        Earning[]
+}
+
+model Vehicle {
+  id          String    @id @default(uuid())
+  driverId    String    @unique
+  driver      Driver    @relation(fields: [driverId], references: [id])
+  make        String    // e.g Toyota
+  model       String    // e.g Corolla
+  year        Int
+  plateNumber String    @unique
+  color       String
+  class       VehicleClass @default(SEDAN)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Booking {
+  id              String        @id @default(uuid())
+  userId          String
+  user            User          @relation("UserBookings", fields: [userId], references: [id])
+  driverId        String?
+  driver          Driver?       @relation("DriverBookings", fields: [driverId], references: [id])
+  type            BookingType
+  status          BookingStatus @default(PENDING)
+  estimatedPrice  Float
+  finalPrice      Float?
+  
+  // Ride fields
+  pickupLat       Float?
+  pickupLng       Float?
+  pickupAddress   String?
+  destLat         Float?
+  destLng         Float?
+  destAddress     String?
+  rideType        String?       // bolt, comfort, xl
+
+  // Intercity fields
+  originCity      String?
+  originArea      String?
+  originAreaLat   Float?
+  originAreaLng   Float?
+  destCity        String?
+  destArea        String?
+  destAreaLat     Float?
+  destAreaLng     Float?
+  departureDate   String?
+  departureTime   String?
+  vehicleClass    VehicleClass?
+  passengers      Int?
+
+  // Logistics fields
+  itemCategory    ItemCategory?
+  itemWeight      Float?
+  itemDescription String?
+  receiverName    String?
+  receiverPhone   String?
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+model Earning {
+  id          String    @id @default(uuid())
+  driverId    String
+  driver      Driver    @relation(fields: [driverId], references: [id])
+  bookingId   String
+  amount      Float
+  createdAt   DateTime  @default(now())
+}
