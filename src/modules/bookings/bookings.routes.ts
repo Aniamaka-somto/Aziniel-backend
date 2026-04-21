@@ -22,5 +22,6 @@ router.get("/:id", protect, getOne);
 router.patch("/:id/cancel", protect, cancel);
 router.patch("/:id/accept", protect, restrictTo("DRIVER"), accept);
 router.patch("/:id/complete", protect, restrictTo("DRIVER"), complete);
+router.post("/estimate", protect, estimatePrice);
 
 export default router;

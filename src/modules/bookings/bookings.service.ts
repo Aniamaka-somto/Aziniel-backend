@@ -8,6 +8,114 @@ import { AppError } from "../../utils/errors";
 
 const prisma = new PrismaClient();
 
+// Add at the top of bookings.service.ts
+interface PricingInput {
+  type: string;
+  pickupLat?: number;
+  pickupLng?: number;
+  destLat?: number;
+  destLng?: number;
+  rideType?: string;
+  vehicleClass?: string;
+  itemWeight?: number;
+  itemCategory?: string;
+  passengers?: number;
+}
+
+function calculateDistance(
+  lat1: number, lng1: number,
+  lat2: number, lng2: number
+): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+    Math.cos((lat2 * Math.PI) / 180) *
+    Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function calculatePrice(data: PricingInput): number {
+  const BASE_FARE: Record<string, number> = {
+    Bolt: 300,
+    Comfort: 500,
+    XL: 700,
+  };
+
+  const PER_KM: Record<string, number> = {
+    Bolt: 150,
+    Comfort: 220,
+    XL: 280,
+  };
+
+  const INTERCITY_BASE: Record<string, number> = {
+    SEDAN: 15000,
+    SUV: 25000,
+  };
+
+  const INTERCITY_PER_KM: Record<string, number> = {
+    SEDAN: 80,
+    SUV: 120,
+  };
+
+  const LOGISTICS_BASE: Record<string, number> = {
+    DOCUMENT: 800,
+    SMALL_PARCEL: 1200,
+    LARGE_PARCEL: 2000,
+    FRAGILE: 2500,
+    ELECTRONICS: 3000,
+  };
+
+  if (data.type === "RIDE") {
+    const rideType = data.rideType ?? "Bolt";
+    const base = BASE_FARE[rideType] ?? 300;
+    const perKm = PER_KM[rideType] ?? 150;
+
+    if (data.pickupLat && data.pickupLng && data.destLat && data.destLng) {
+      const distance = calculateDistance(
+        data.pickupLat, data.pickupLng,
+        data.destLat, data.destLng
+      );
+      return Math.round(base + distance * perKm);
+    }
+    return base + 5 * perKm; // fallback 5km
+  }
+
+  if (data.type === "INTERCITY") {
+    const cls = data.vehicleClass?.toUpperCase() ?? "SEDAN";
+    const base = INTERCITY_BASE[cls] ?? 15000;
+    const perKm = INTERCITY_PER_KM[cls] ?? 80;
+
+    if (data.pickupLat && data.pickupLng && data.destLat && data.destLng) {
+      const distance = calculateDistance(
+        data.pickupLat, data.pickupLng,
+        data.destLat, data.destLng
+      );
+      return Math.round(base + distance * perKm);
+    }
+    return base;
+  }
+
+  if (data.type === "LOGISTICS") {
+    const cat = data.itemCategory?.toUpperCase() ?? "SMALL_PARCEL";
+    const base = LOGISTICS_BASE[cat] ?? 1200;
+    const weightCharge = (data.itemWeight ?? 1) * 200;
+
+    if (data.pickupLat && data.pickupLng && data.destLat && data.destLng) {
+      const distance = calculateDistance(
+        data.pickupLat, data.pickupLng,
+        data.destLat, data.destLng
+      );
+      return Math.round(base + weightCharge + distance * 50);
+    }
+    return base + weightCharge;
+  }
+
+  return 1500;
+}
+
 type CreateBookingBody = {
   type: string;
   estimatedPrice?: number;
@@ -40,15 +148,19 @@ type CreateBookingBody = {
 export const createBooking = async (userId: string, data: CreateBookingBody) => {
   let estimatedPrice = 0;
 
-  if (data.type === "RIDE") {
-    estimatedPrice = data.estimatedPrice ?? 1500;
-  } else if (data.type === "INTERCITY") {
-    estimatedPrice = data.estimatedPrice ?? 8000;
-  } else if (data.type === "LOGISTICS") {
-    const baseRate = 2000;
-    const weightRate = (data.itemWeight ?? 1) * 300;
-    estimatedPrice = data.estimatedPrice ?? baseRate + weightRate;
-  }
+// Replace the if/else price block with:
+const estimatedPrice = data.estimatedPrice ?? calculatePrice({
+  type: data.type,
+  pickupLat: data.pickupLat,
+  pickupLng: data.pickupLng,
+  destLat: data.destLat,
+  destLng: data.destLng,
+  rideType: data.rideType,
+  vehicleClass: data.vehicleClass,
+  itemWeight: data.itemWeight,
+  itemCategory: data.itemCategory,
+  passengers: data.passengers,
+});
 
   const itemCategory = data.itemCategory as ItemCategory | undefined;
   const vehicleClass = data.vehicleClass as VehicleClass | undefined;
@@ -174,3 +286,4 @@ export const completeBooking = async (
 
   return updated;
 };
+export { calculatePrice };

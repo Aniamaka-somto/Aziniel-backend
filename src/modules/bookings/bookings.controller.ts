@@ -13,6 +13,9 @@ import { sendSuccess } from "../../utils/response";
 import { getIO } from "../../socket";
 import { PrismaClient } from "@prisma/client";
 import { AppError } from "../../utils/errors";
+import Expo from "expo-server-sdk";
+
+const expo = new Expo();
 
 const prisma = new PrismaClient();
 
@@ -25,7 +28,31 @@ function bookingIdParam(req: AuthRequest): string {
 
 export const create = async (req: AuthRequest, res: Response) => {
   const booking = await createBooking(req.user!.userId, req.body);
+  
+  // Emit socket event
   getIO().emit("booking:new", booking);
+
+  // Send push to all online drivers
+  const onlineDrivers = await prisma.driver.findMany({
+    where: { status: "ONLINE" },
+    include: { user: true },
+  });
+
+  const messages = onlineDrivers
+    .filter((d) => d.user.pushToken && Expo.isExpoPushToken(d.user.pushToken))
+    .map((d) => ({
+      to: d.user.pushToken!,
+      channelId: "ride-requests",
+      sound: "default" as const,
+      title: "New Ride Request ⚡",
+      body: `₦${booking.estimatedPrice?.toLocaleString()} · ${booking.pickupAddress ?? "Pickup location"}`,
+      data: { bookingId: booking.id, type: "ride-request" },
+    }));
+
+  if (messages.length > 0) {
+    await expo.sendPushNotificationsAsync(messages);
+  }
+
   sendSuccess(res, booking, "Booking created", 201);
 };
 
@@ -75,4 +102,8 @@ export const complete = async (req: AuthRequest, res: Response) => {
   const booking = await completeBooking(bookingIdParam(req), driver.id);
   getIO().to(`booking:${booking.id}`).emit("ride:completed", booking);
   sendSuccess(res, booking, "Booking completed");
+};
+export const estimatePrice = async (req: AuthRequest, res: Response) => {
+  const price = calculatePrice(req.body);
+  sendSuccess(res, { price }, "Price estimated");
 };

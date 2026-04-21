@@ -17,3 +17,11 @@ export const me = async (req: AuthRequest, res: Response) => {
   const user = await getMe(req.user!.userId);
   sendSuccess(res, user, "User fetched");
 };
+export const savePushToken = async (req: AuthRequest, res: Response) => {
+  const { pushToken } = req.body;
+  await prisma.user.update({
+    where: { id: req.user!.userId },
+    data: { pushToken },
+  });
+  sendSuccess(res, null, "Push token saved");
+};
