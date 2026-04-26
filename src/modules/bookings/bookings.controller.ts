@@ -8,6 +8,10 @@ import {
   getAvailableBookings,
   acceptBooking,
   completeBooking,
+  calculatePrice,
+  startDispatch,
+  handleDriverDecline,
+  handleDriverAccept,
 } from "./bookings.service";
 import { sendSuccess } from "../../utils/response";
 import { getIO } from "../../socket";
@@ -28,32 +32,34 @@ function bookingIdParam(req: AuthRequest): string {
 
 export const create = async (req: AuthRequest, res: Response) => {
   const booking = await createBooking(req.user!.userId, req.body);
-  
-  // Emit socket event
-  getIO().emit("booking:new", booking);
 
-  // Send push to all online drivers
-  const onlineDrivers = await prisma.driver.findMany({
-    where: { status: "ONLINE" },
-    include: { user: true },
-  });
-
-  const messages = onlineDrivers
-    .filter((d) => d.user.pushToken && Expo.isExpoPushToken(d.user.pushToken))
-    .map((d) => ({
-      to: d.user.pushToken!,
-      channelId: "ride-requests",
-      sound: "default" as const,
-      title: "New Ride Request ⚡",
-      body: `₦${booking.estimatedPrice?.toLocaleString()} · ${booking.pickupAddress ?? "Pickup location"}`,
-      data: { bookingId: booking.id, type: "ride-request" },
-    }));
-
-  if (messages.length > 0) {
-    await expo.sendPushNotificationsAsync(messages);
+  // Start targeted dispatch instead of broadcasting
+  if (booking.type === "RIDE" && booking.pickupLat && booking.pickupLng) {
+    startDispatch(booking.id, booking.pickupLat, booking.pickupLng, getIO());
+  } else {
+    // Intercity and logistics just broadcast to available drivers
+    getIO().emit("booking:new", booking);
   }
 
   sendSuccess(res, booking, "Booking created", 201);
+};
+
+// Update accept:
+export const accept = async (req: AuthRequest, res: Response) => {
+  const driver = await prisma.driver.findUnique({
+    where: { userId: req.user!.userId },
+  });
+  if (!driver) throw new AppError("Driver profile not found", 404);
+
+  const booking = await acceptBooking(bookingIdParam(req), driver.id);
+
+  // Clear dispatch queue for this booking
+  handleDriverAccept(booking!.id);
+
+  // Notify passenger
+  getIO().to(`user:${booking!.userId}`).emit("ride:accepted", booking);
+
+  sendSuccess(res, booking, "Booking accepted");
 };
 
 export const myBookings = async (req: AuthRequest, res: Response) => {
@@ -62,10 +68,7 @@ export const myBookings = async (req: AuthRequest, res: Response) => {
 };
 
 export const getOne = async (req: AuthRequest, res: Response) => {
-  const booking = await getBookingById(
-    bookingIdParam(req),
-    req.user!.userId,
-  );
+  const booking = await getBookingById(bookingIdParam(req), req.user!.userId);
   sendSuccess(res, booking, "Booking fetched");
 };
 
@@ -82,17 +85,6 @@ export const available = async (_req: AuthRequest, res: Response) => {
   sendSuccess(res, bookings, "Available bookings");
 };
 
-export const accept = async (req: AuthRequest, res: Response) => {
-  const driver = await prisma.driver.findUnique({
-    where: { userId: req.user!.userId },
-  });
-  if (!driver) throw new AppError("Driver profile not found", 404);
-
-  const booking = await acceptBooking(bookingIdParam(req), driver.id);
-  getIO().to(`user:${booking.userId}`).emit("ride:accepted", booking);
-  sendSuccess(res, booking, "Booking accepted");
-};
-
 export const complete = async (req: AuthRequest, res: Response) => {
   const driver = await prisma.driver.findUnique({
     where: { userId: req.user!.userId },
@@ -106,4 +98,13 @@ export const complete = async (req: AuthRequest, res: Response) => {
 export const estimatePrice = async (req: AuthRequest, res: Response) => {
   const price = calculatePrice(req.body);
   sendSuccess(res, { price }, "Price estimated");
+};
+export const decline = async (req: AuthRequest, res: Response) => {
+  const driver = await prisma.driver.findUnique({
+    where: { userId: req.user!.userId },
+  });
+  if (!driver) throw new AppError("Driver profile not found", 404);
+
+  handleDriverDecline(bookingIdParam(req), driver.id, getIO());
+  sendSuccess(res, null, "Booking declined");
 };

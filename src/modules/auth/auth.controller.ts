@@ -1,7 +1,10 @@
 import { Request, Response } from "express";
+import { PrismaClient } from "@prisma/client";
 import { registerUser, loginUser, getMe } from "./auth.service";
 import { sendSuccess } from "../../utils/response";
 import { AuthRequest } from "../../middleware/auth";
+
+const prisma = new PrismaClient();
 
 export const register = async (req: Request, res: Response) => {
   const result = await registerUser(req.body);

@@ -8,6 +8,8 @@ import {
   available,
   accept,
   complete,
+  estimatePrice,
+  decline,
 } from "./bookings.controller";
 
 const router = Router();
@@ -23,5 +25,6 @@ router.patch("/:id/cancel", protect, cancel);
 router.patch("/:id/accept", protect, restrictTo("DRIVER"), accept);
 router.patch("/:id/complete", protect, restrictTo("DRIVER"), complete);
 router.post("/estimate", protect, estimatePrice);
+router.patch("/:id/decline", protect, restrictTo("DRIVER"), decline);
 
 export default router;

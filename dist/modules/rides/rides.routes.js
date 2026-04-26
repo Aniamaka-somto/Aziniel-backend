@@ -1,0 +1,10 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const auth_1 = require("../../middleware/auth");
+const rides_controller_1 = require("./rides.controller");
+const router = (0, express_1.Router)();
+router.get("/active", auth_1.protect, rides_controller_1.activeRide);
+router.get("/driver/active", auth_1.protect, (0, auth_1.restrictTo)("DRIVER"), rides_controller_1.driverActiveRide);
+router.post("/:id/rate", auth_1.protect, rides_controller_1.rate);
+exports.default = router;

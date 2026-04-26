@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { register, login, me } from "./auth.controller";
+import { register, login, me, savePushToken } from "./auth.controller";
 import { protect } from "../../middleware/auth";
 
 const router = Router();

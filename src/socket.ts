@@ -15,6 +15,7 @@ export const initSocket = (server: http.Server) => {
     console.log(`Socket connected: ${socket.id}`);
 
     // Driver goes online — joins their own room
+    // Update driver:online handler:
     socket.on("driver:online", (driverId: string) => {
       socket.join(`driver:${driverId}`);
       console.log(`Driver ${driverId} is online`);
