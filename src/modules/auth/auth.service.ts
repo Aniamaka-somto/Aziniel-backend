@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import { AppError } from "../../utils/errors";
 import { signToken } from "../../utils/jwt";
 
-const prisma = new PrismaClient();
+import { prisma } from "../../lib/prisma";
 
 export const registerUser = async (data: {
   fullName: string;

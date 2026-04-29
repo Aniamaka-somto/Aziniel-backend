@@ -19,6 +19,8 @@ export const initSocket = (server: http.Server) => {
     socket.on("driver:online", (driverId: string) => {
       socket.join(`driver:${driverId}`);
       console.log(`Driver ${driverId} is online`);
+      console.log(`Driver ${driverId} joined room driver:${driverId}`); // ← add
+      console.log("All rooms this socket is in:", Array.from(socket.rooms));
     });
 
     // User joins their own room to receive updates

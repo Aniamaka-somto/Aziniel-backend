@@ -1,7 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { AppError } from "../../utils/errors";
 
-const prisma = new PrismaClient();
+import { prisma } from "../../lib/prisma";
 
 export const getActiveRide = async (userId: string) => {
   return prisma.booking.findFirst({

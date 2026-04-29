@@ -1,7 +1,7 @@
 import { PrismaClient, DriverStatus, VehicleClass } from "@prisma/client";
 import { AppError } from "../../utils/errors";
 
-const prisma = new PrismaClient();
+import { prisma } from "../../lib/prisma";
 
 export const getDriverProfile = async (userId: string) => {
   const driver = await prisma.driver.findUnique({
@@ -101,7 +101,11 @@ export const getDriverBookings = async (userId: string) => {
     include: { user: true },
   });
 };
-export const getNearbyDrivers = async (lat: number, lng: number, radiusKm = 5) => {
+export const getNearbyDrivers = async (
+  lat: number,
+  lng: number,
+  radiusKm = 5,
+) => {
   const drivers = await prisma.driver.findMany({
     where: {
       status: "ONLINE",
@@ -116,7 +120,9 @@ export const getNearbyDrivers = async (lat: number, lng: number, radiusKm = 5) =
 
   const nearby = drivers.filter((driver) => {
     if (!driver.currentLat || !driver.currentLng) return false;
-    return getDistanceKm(lat, lng, driver.currentLat, driver.currentLng) <= radiusKm;
+    return (
+      getDistanceKm(lat, lng, driver.currentLat, driver.currentLng) <= radiusKm
+    );
   });
 
   return nearby.map((d) => ({
@@ -130,8 +136,10 @@ export const getNearbyDrivers = async (lat: number, lng: number, radiusKm = 5) =
 };
 
 const getDistanceKm = (
-  lat1: number, lng1: number,
-  lat2: number, lng2: number
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number,
 ): number => {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -139,8 +147,8 @@ const getDistanceKm = (
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos((lat1 * Math.PI) / 180) *
-    Math.cos((lat2 * Math.PI) / 180) *
-    Math.sin(dLng / 2) *
-    Math.sin(dLng / 2);
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2);
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 };

@@ -6,7 +6,7 @@ import {
 } from "@prisma/client";
 import { AppError } from "../../utils/errors";
 
-const prisma = new PrismaClient();
+import { prisma } from "../../lib/prisma";
 
 // Add at the top of bookings.service.ts
 interface PricingInput {
@@ -333,28 +333,28 @@ export const startDispatch = async (
   pickupLng: number,
   io: any,
 ) => {
-  // Get all online drivers sorted by distance
   const drivers = await prisma.driver.findMany({
     where: {
       status: "ONLINE",
       currentLat: { not: null },
       currentLng: { not: null },
-      isVerified: true,
+      // isVerified: true,
     },
-    include: {
-      user: true,
-      vehicle: true,
-    },
+    include: { user: true, vehicle: true },
   });
 
-  if (drivers.length === 0) {
-    // No drivers available — notify passenger
-    io.to(`booking:${bookingId}`).emit("booking:no_drivers", {
-      bookingId,
-      message: "No drivers available right now. Please try again.",
-    });
-    return;
-  }
+  console.log("DISPATCH: total online drivers found:", drivers.length); // ← add
+  console.log(
+    "DISPATCH: driver locations:",
+    drivers.map((d) => ({
+      // ← add
+      id: d.id,
+      lat: d.currentLat,
+      lng: d.currentLng,
+      status: d.status,
+      verified: d.isVerified,
+    })),
+  );
 
   // Sort by distance to pickup
   const sorted = drivers

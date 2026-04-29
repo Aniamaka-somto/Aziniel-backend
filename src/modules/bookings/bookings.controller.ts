@@ -21,7 +21,7 @@ import Expo from "expo-server-sdk";
 
 const expo = new Expo();
 
-const prisma = new PrismaClient();
+import { prisma } from "../../lib/prisma";
 
 function bookingIdParam(req: AuthRequest): string {
   const raw = req.params.id;
@@ -33,11 +33,14 @@ function bookingIdParam(req: AuthRequest): string {
 export const create = async (req: AuthRequest, res: Response) => {
   const booking = await createBooking(req.user!.userId, req.body);
 
-  // Start targeted dispatch instead of broadcasting
+  console.log("BOOKING CREATED:", booking.id, "type:", booking.type);
+  console.log("PICKUP:", booking.pickupLat, booking.pickupLng);
+
   if (booking.type === "RIDE" && booking.pickupLat && booking.pickupLng) {
+    console.log("STARTING DISPATCH...");
     startDispatch(booking.id, booking.pickupLat, booking.pickupLng, getIO());
   } else {
-    // Intercity and logistics just broadcast to available drivers
+    console.log("BROADCAST (non-RIDE or missing coords)");
     getIO().emit("booking:new", booking);
   }
 
